@@ -20,7 +20,9 @@ class Perceptron:
     def _bgd_loss(self, y, y_pred):
         loss = -y * y_pred
         loss[loss < 0] = 0
+        #print(f"loss={loss}")
         loss = np.sum(loss) / y.size
+        print(loss)
         return loss
     
     def _gradient(self, x_bar, y, y_pred):
@@ -77,6 +79,7 @@ class Perceptron:
     def predict(self, X):
         X = self._preprocess_data(X)
         y_pred = X @ self.W
+        # y_pred = np.where(y_pred > 0, 1, 2)
         for i, y in enumerate(y_pred):
             if y > 0:
                 y_pred[i] = 2
@@ -91,7 +94,9 @@ class Perceptron:
         for iter in range(self.n_iter):
             for i, x in enumerate(X):
                 y_pred = self._predict(x)
+                print(f"y_pred={y_pred}")
                 loss =  self._loss(y[i], y_pred)
+                print(f"loss={loss}")
                 self.loss.append(loss)
 
                 if self.tol is not None:
@@ -107,6 +112,7 @@ class Perceptron:
                     else:
                         epoch_no_improve = 0
                         grad = self._gradient(x, y[i], y_pred)
+                        print(f"grad={grad}")
                         self.W = self.W - self.lr * grad
             if break_out:
                 break_out = False
@@ -116,7 +122,11 @@ class Perceptron:
         epoch_no_improve = 0
 
         for iter in range(self.n_iter):
+            print(f'==========epoch_num={iter+1}===========')
+            # print(X.shape)
             y_pred = self._predict(X)
+            print(f"y_pred_shape={y_pred.shape}")
+            print(f"y_shape={y.shape}")
             loss = self._bgd_loss(y, y_pred)
             self.loss.append(loss)
 
@@ -134,6 +144,7 @@ class Perceptron:
 
             grad = self._bgd_gradient(X, y, y_pred)
             self.W = self.W - self.lr * grad
+            print(f"current_weight={self.W}")
     
 
     def train(self, X_train, Y_train):
@@ -144,20 +155,21 @@ class Perceptron:
             self.stochastic_update(X_train_bar, Y_train)
 
     def plot_loss(self):
+        # print(self.loss)for i, x in enumerate(X):
         plt.plot(self.loss)
         plt.title('loss')
         plt.grid()
         plt.show()
     
-    def accuracy(self,y_true, y_pred):
+    def accuracy(y_true, y_pred):
         return np.sum(y_true == y_pred) / len(y_true)
 
-    def precision(self,y_true, y_pred):
+    def precision(y_true, y_pred):
         TP = np.sum((y_true == 1) & (y_pred == 1))  # True Positives (1 correctly predicted as 1)
         FP = np.sum((y_true == 2) & (y_pred == 1))  # False Positives (2 incorrectly predicted as 1)
         return TP / (TP + FP) if (TP + FP) != 0 else 0
 
-    def recall(self,y_true, y_pred):
+    def recall(y_true, y_pred):
         TP = np.sum((y_true == 1) & (y_pred == 1))  # True Positives (1 correctly predicted as 1)
         FN = np.sum((y_true == 1) & (y_pred == 2))  # False Negatives (1 incorrectly predicted as 2)
         return TP / (TP + FN) if (TP + FN) != 0 else 0
@@ -166,13 +178,8 @@ class Perceptron:
         prec = self.precision(y_true, y_pred)
         rec = self.recall(y_true, y_pred)
         return 2 * (prec * rec) / (prec + rec) if (prec + rec) != 0 else 0
-    
-    def evaluate(self, y_true, y_pred):
-        print("==========Evaluation of the model===========")
-        print(f"accuracy={self.accuracy(y_true, y_pred)}")
-        print(f"precision={self.precision(y_true, y_pred)}")
-        print(f"recall={self.recall(y_true, y_pred)}")
-        print(f"f1_score={self.f1_score(y_true, y_pred)}")
+
+
 
 
 def load_data(file, ratio, random_state = None):
@@ -185,26 +192,33 @@ def load_data(file, ratio, random_state = None):
 
         split_index = int(dataset.shape[0] * (1 - ratio))
         train_indices, test_indices = indices[:split_index], indices[split_index:]
-        train_data = dataset[train_indices]
-        test_data = dataset[test_indices]
-        
-        X_train = train_data[:, 1:]
-        y_train = train_data[:, 0]
-        print(f"y_train = {y_train}")
-        X_test = test_data[:, 1:]
-        y_test = test_data[:, 0]
-        y_train[y_train == 2] = 1.0000000000001
-        y_train[y_train == 1] = -1
-        print(f"formed_y_train={y_train}")
-        return X_train, X_test, y_train, y_test
+        data_train = dataset[train_indices]
+        data_test = dataset[test_indices]
+
+        return data_train, data_test
     
 
 if __name__ == '__main__':
-    X_train, X_test, y_train, y_test= load_data('separate_Perceptron/wine_formed_data', 0.3, True)
+    train_data, test_data = load_data('separate_Perceptron/wine_formed_data', 0.3, True)
+    # print(f"train_data:{train_data}\n")
+    # print(f"test_data:{test_data}\n")
+    X_train = train_data[:, 1:]
+    y_train = train_data[:, 0]
+    X_test = test_data[:, 1:]
+    y_test = test_data[:, 0]
+    for i,y in enumerate(y_train):
+        if y == 2:
+            y_train[i] = 1
+    for i,y in enumerate(y_train):
+        if y == 1:
+            y_train[i] = -1
+    print(f"y_train={y_train}")
     _,n_feature = X_train.shape
-    model = Perceptron(n_feature=n_feature, n_iter=900, lr=0.00001, tol=0.1, train_mode='BGD')
+    model = Perceptron(n_feature=n_feature, n_iter=900, lr=0.001, tol=0.0001, train_mode='SGD')
     model.train(X_train, y_train)
     plt.figure()
     model.plot_loss()
     y_pred = model.predict(X_test)
-    model.evaluate(y_test, y_pred)
+    print(f"predicted_y = {y_pred}")
+    print(f"true_y = {y_test}")
+    print(y_pred - y_test)
