@@ -193,7 +193,7 @@ def load_data(file, ratio, random_state = None):
         print(f"y_train = {y_train}")
         X_test = test_data[:, 1:]
         y_test = test_data[:, 0]
-        y_train[y_train == 2] = 1.0000000000001
+        y_train[y_train == 2] = 1.000000000001
         y_train[y_train == 1] = -1
         print(f"formed_y_train={y_train}")
         return X_train, X_test, y_train, y_test
@@ -202,7 +202,7 @@ def load_data(file, ratio, random_state = None):
 if __name__ == '__main__':
     X_train, X_test, y_train, y_test= load_data('separate_Perceptron/wine_formed_data', 0.3, True)
     _,n_feature = X_train.shape
-    model = Perceptron(n_feature=n_feature, n_iter=900, lr=0.00001, tol=0.1, train_mode='BGD')
+    model = Perceptron(n_feature=n_feature, n_iter=900, lr=0.000001, tol=0.1, train_mode='SGD')
     model.train(X_train, y_train)
     plt.figure()
     model.plot_loss()
