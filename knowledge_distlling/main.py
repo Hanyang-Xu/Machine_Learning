@@ -79,4 +79,5 @@ def get_dataloader(train_flag, args):
                                              pin_memory     = True)
     return dataloader
 
-
+if __name__ == '__main__':
+    
