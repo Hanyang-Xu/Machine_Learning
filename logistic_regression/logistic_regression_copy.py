@@ -10,7 +10,7 @@ class LogisticRegression:
         self.W = np.random.random(n_feature+1) * 0.05
         self.loss = []
         self.best_loss = np.inf
-        self.patience = 2
+        self.patience = 5
         self.batch_size = batch_size
 
     def _linear_tf(self, X):
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     model.train(X_train, y_train)
     plt.figure()
     model.plot_loss()
-    print(y_test)
+    # print(y_test)
     y_pred = model.predict(X_test)
-    print(y_pred)
+    # print(y_pred)
     model.evaluate(y_test, y_pred)
