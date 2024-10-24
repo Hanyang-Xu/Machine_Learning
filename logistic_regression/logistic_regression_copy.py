@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class LogisticRegression:
-    def __init__(self, n_feature=1, n_iter=200, lr=1e-3, tol=None, train_mode='BGD'):
+    def __init__(self, n_feature=1, n_iter=200, lr=1e-3, tol=None, train_mode='SGD', batch_size=None):
         self.n_iter = n_iter
         self.lr = lr
         self.tol = tol
@@ -10,7 +10,8 @@ class LogisticRegression:
         self.W = np.random.random(n_feature+1) * 0.05
         self.loss = []
         self.best_loss = np.inf
-        self.patience = 10
+        self.patience = 2
+        self.batch_size = batch_size
 
     def _linear_tf(self, X):
         return X @ self.W
@@ -49,33 +50,15 @@ class LogisticRegression:
         return X_shuffled, y_shuffled
      
     def stochastic_update(self, init_X, init_y):
-
-        if self.tol is not None:
-            loss_old = np.inf
+        epoch_no_improve = 0
+        break_out = False
+        batch_size = self.batch_size
 
         for iter in range(self.n_iter):
-            print(f'==========epoch_num={iter+1}===========')
             X, y = self._shuffle(init_X, init_y)
             sample = X[0,:].reshape(-1,14)
-            y = y[0,:]
+            y = y[0,:].reshape(-1)
             y_pred = self._predict_probality(sample).reshape(-1)
-            loss = self._loss(y, y_pred)
-            self.loss.append(loss)
-
-            if self.tol is not None:
-                if np.abs(loss_old - loss) < self.tol:
-                    break
-                loss_old = loss
-        
-            grad = self._gradient(sample, y, y_pred)
-            self.W = self.W - self.lr * grad
-            print(f'current_weight={self.W}\n')
-    
-    def batch_update(self, X, y):
-        epoch_no_improve = 0
-
-        for iter in range(self.n_iter):
-            y_pred = self._predict_probality(X)
             loss = self._loss(y, y_pred)
             self.loss.append(loss)
 
@@ -87,18 +70,54 @@ class LogisticRegression:
                     epoch_no_improve += 1
                     if epoch_no_improve >= self.patience:
                         print(f"Early stopping triggered due to the no improvement in loss.")
+                        break_out = True
                         break
                 else:
                     epoch_no_improve = 0
-
-            grad = self._gradient(X, y, y_pred)
+            grad = self._gradient(sample, y, y_pred)
             self.W = self.W - self.lr * grad
+            
+    
+
+    
+    def mini_batch_update(self, init_X, init_y):
+        epoch_no_improve = 0
+        break_out = False
+        batch_size = self.batch_size
+
+        for iter in range(self.n_iter):
+            X, y = self._shuffle(init_X, init_y)
+            for j in range(int(X.shape[0]/batch_size)):
+                sample = X[j*batch_size:(j+1)*batch_size,:].reshape(-1,14)
+                y_sample = y[j*batch_size:(j+1)*batch_size,:].reshape(-1)
+                y_pred = self._predict_probality(sample).reshape(-1)
+                loss = self._loss(y_sample, y_pred)
+                self.loss.append(loss)
+
+                if self.tol is not None:
+                    if loss < self.best_loss - self.tol:
+                        self.best_loss = loss
+                        epoch_no_improve = 0
+                    elif np.abs(loss - self.best_loss) < self.tol:
+                        epoch_no_improve += 1
+                        if epoch_no_improve >= self.patience:
+                            print(f"Early stopping triggered due to the no improvement in loss.")
+                            break_out = True
+                            break
+                    else:
+                        epoch_no_improve = 0
+                grad = self._gradient(sample, y_sample, y_pred)
+                self.W = self.W - self.lr * grad
+    
+            if break_out:
+                break_out = False
+                break
     
 
     def train(self, X_train, Y_train):
         X_train_bar = self._preprocess_data(X_train)
-        if self.train_mode == 'BGD':
-            self.batch_update(X_train_bar, Y_train)
+        if self.train_mode == 'MBGD':
+            self.mini_batch_update(X_train_bar, Y_train)
         elif self.train_mode == 'SGD':
             self.stochastic_update(X_train_bar, Y_train)
 
@@ -168,9 +187,9 @@ def load_data(file, ratio, random_state = None):
     
 
 if __name__ == '__main__':
-    X_train, X_test, y_train, y_test= load_data('separate_Perceptron/wine_formed_data', 0.3, True)
+    X_train, X_test, y_train, y_test= load_data('separate_Perceptron/wine_formed_data', 0.3, 42)
     _,n_feature = X_train.shape
-    model = LogisticRegression(n_feature=n_feature, n_iter=300, lr=0.0000001, tol=0.1, train_mode='SGD')
+    model = LogisticRegression(n_feature=n_feature, n_iter=500, lr=0.000001, tol=0.1, train_mode='MBGD', batch_size=10)
     model.train(X_train, y_train)
     plt.figure()
     model.plot_loss()
