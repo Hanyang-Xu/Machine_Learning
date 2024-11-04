@@ -2,12 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class MultilayerPerceptron():
-    def __init__(self, n_feature=1, n_iter=200, lr=1e-3, tol=None, train_mode='SGD', batch_size = 10):
+    def __init__(self, n_feature=1, n_iter=200, lr=1e-3, tol=None, train_mode='SGD', batch_size = 10, type='classify'):
         self.batch_size = batch_size
         self.n_iter = n_iter
         self.lr = lr
         self.tol = tol
         self.train_mode = train_mode
+        self.type = type
         self.best_loss = np.inf
         self.patience = 10
         self.layer_list = []
@@ -25,6 +26,8 @@ class MultilayerPerceptron():
                 out = 1. / (1. + np.exp(-U))
             elif self.activation == 'relu':
                 out = np.maximum(0, U)
+            elif self.activation == 'linear':
+                out = U
             return out
 
         def act_derivative(self, X):
@@ -33,6 +36,8 @@ class MultilayerPerceptron():
                 out = s * (1 - s)
             elif self.activation == 'relu':
                 out = np.where(X > 0, 1, 0)
+            elif self.activation == 'linear':
+                out = np.ones_like(X)
             return out
         
         def return_act(self):
@@ -46,9 +51,13 @@ class MultilayerPerceptron():
         return X_
     
     def _cross_entropy(self, y, y_pred):
-        epsilon = 1e-5
-        loss = -(y*np.log(y_pred + epsilon) + (1-y)*np.log(1-y_pred+epsilon))
-        loss = np.mean(loss)
+        if self.type == 'classify':
+            epsilon = 1e-5
+            loss = -(y*np.log(y_pred + epsilon) + (1-y)*np.log(1-y_pred+epsilon))
+            loss = np.mean(loss)
+        elif self.type == 'regression':
+            # print("using mse loss")
+            loss = np.mean((y - y_pred) ** 2)
         return loss
 
     def _shuffle(self, X, y):
@@ -87,9 +96,6 @@ class MultilayerPerceptron():
         U_reverse_list = self.U[::-1]
         H_reverse_list = self.H[::-1]
         layer_reverse_list = self.layer_list[::-1]
-        for i, l in enumerate(layer_reverse_list):
-            flags = l.return_act()
-            print(flags)
 
         for i in range(len(H_reverse_list)-1):
             if i == 0:
@@ -194,12 +200,15 @@ class MultilayerPerceptron():
 
     def predict(self, X):
         self.forward(X)
-        y_pred = self.H[-1]
-        # for i, y in enumerate(y_pred):
-        #     if y > 0.5:
-        #         y_pred[i] = 2
-        #     elif y < 0.5:
-        #         y_pred[i] = 1
+        if self.type == "classify":
+            y_pred = self.H[-1].reshape(-1)
+            for i, y in enumerate(y_pred):
+                if y > 0.5:
+                    y_pred[i] = 2
+                elif y < 0.5:
+                    y_pred[i] = 1
+        if self.type == "regression":
+            y_pred = self.H[-1].reshape(-1)
         return y_pred
 
     def plot_loss(self):
@@ -207,6 +216,31 @@ class MultilayerPerceptron():
         plt.title('loss')
         plt.grid()
         plt.show()
+
+    def accuracy(self,y_true, y_pred):
+        return np.sum(y_true == y_pred) / len(y_true)
+
+    def precision(self,y_true, y_pred):
+        TP = np.sum((y_true == 1) & (y_pred == 1))  # True Positives (1 correctly predicted as 1)
+        FP = np.sum((y_true == 2) & (y_pred == 1))  # False Positives (2 incorrectly predicted as 1)
+        return TP / (TP + FP) if (TP + FP) != 0 else 0
+
+    def recall(self,y_true, y_pred):
+        TP = np.sum((y_true == 1) & (y_pred == 1))  # True Positives (1 correctly predicted as 1)
+        FN = np.sum((y_true == 1) & (y_pred == 2))  # False Negatives (1 incorrectly predicted as 2)
+        return TP / (TP + FN) if (TP + FN) != 0 else 0
+    
+    def f1_score(self, y_true, y_pred):
+        prec = self.precision(y_true, y_pred)
+        rec = self.recall(y_true, y_pred)
+        return 2 * (prec * rec) / (prec + rec) if (prec + rec) != 0 else 0
+    
+    def evaluate(self, y_true, y_pred):
+        print("==========Evaluation of the model===========")
+        print(f"accuracy={self.accuracy(y_true, y_pred)}")
+        print(f"precision={self.precision(y_true, y_pred)}")
+        print(f"recall={self.recall(y_true, y_pred)}")
+        print(f"f1_score={self.f1_score(y_true, y_pred)}")
 
 def load_data(file, ratio, random_state = None):
         dataset = np.loadtxt(file, delimiter=',')
@@ -232,18 +266,50 @@ def load_data(file, ratio, random_state = None):
 
 
 if __name__ == '__main__':
+    # Classifier Performance Evaluation
     X_train, X_test, y_train, y_test= load_data('separate_Perceptron/wine_formed_data', 0.3, True)
+    print(f"X:{X_train.shape}")
+    print(f"y:{y_train.shape}")
     _,n_feature = X_train.shape
-    MLP = MultilayerPerceptron(n_feature=n_feature, n_iter=300, lr=0.1, tol=0.06, train_mode='SGD')
+    min_val = np.min(X_train, axis=0)
+    max_val = np.max(X_train, axis=0)
+    X_train = (X_train - min_val) / (max_val - min_val)
+    X_test = (X_test - min_val) / (max_val - min_val)
+    MLP = MultilayerPerceptron(n_feature=n_feature, n_iter=300, lr=0.1, tol=0.01, train_mode='MBGD')
     MLP.build_layer(13, 16, 'relu')
     MLP.build_layer(16, 8, 'relu')
     MLP.build_layer(8, 4, 'relu')
     MLP.build_layer(4, 1, 'sigmoid')
-    MLP.forward(X_train)
-    MLP.backward(y_train)
-    print(MLP.H)
-    # print(X_test)
+    MLP.train(X_train, y_train)
+    MLP.plot_loss()
+    y_pred = MLP.predict(X_test)
+    print(f"y_true:{y_test}")
+    print(f"y_pred:{y_pred}")
+    MLP.evaluate(y_test, y_pred)
+
+    # Nonlinear Function Approximation
+    # X = np.arange(100).reshape(100,1)
+    # y = 0.01 * (X**2) - 1.5 * X + 20+ np.random.normal(0, 5, size=X.shape)
+    # y_train = y.reshape(-1)
+    # _, n_feature = X.shape
+    # print(X.shape)
+    # print(y.shape)
+    # print(n_feature)
+
+    # min_val = np.min(X, axis=0)
+    # max_val = np.max(X, axis=0)
+    # X_train = (X - min_val) / (max_val - min_val)
+    # X_test = (X - min_val) / (max_val - min_val)
+    # y_min = np.min(y_train)
+    # y_max = np.max(y_train)
+    # y_train = (y_train - y_min) / (y_max - y_min)
+
+    # MLP = MultilayerPerceptron(n_feature=n_feature, n_iter=300, lr=0.00001, tol=0.1, train_mode='MBGD', type='regression')
+    # MLP.build_layer(1, 4, 'relu')
+    # MLP.build_layer(4, 1, 'linear')
+    # MLP.train(X_train, y_train)
+    # MLP.plot_loss()
     # y_pred = MLP.predict(X_test)
+    # print(f"y_true:{y_train}")
     # print(f"y_pred:{y_pred}")
-    # print("Output of the last layer (H):")
-    # print(MLP.H[-1].shape)  # 打印最后一层的输出
+    # MLP.evaluate(y_train, y_pred)
