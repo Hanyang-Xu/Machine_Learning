@@ -289,25 +289,26 @@ if __name__ == '__main__':
     # Nonlinear Function Approximation
 
     # X = np.linspace(-10, 10, 100).reshape(100,1)
-    # y = X**2 + 0.01 * np.random.normal(0, 5, size=X.shape)
+    # y = X**2 + 0.1 * np.random.normal(0, 5, size=X.shape)
     # y_train = y.reshape(-1)
     # _, n_feature = X.shape
     # print(X.shape)
     # print(y.shape)
     # print(n_feature)
-    # MLP = MultilayerPerceptron(n_iter=300, lr=0.0001, tol=0.1, train_mode='MBGD', type='regression')
+    # MLP = MultilayerPerceptron(n_iter=300, lr=0.0001, tol=0.1, 
+    #                            train_mode='MBGD', type='regression')
     # MLP.build_layer(n_feature, 16, 'relu')
     # MLP.build_layer(16, 64, 'relu')
-    # MLP.build_layer(64, 32, 'relu')
-    # MLP.build_layer(32, 1, 'linear')
+    # MLP.build_layer(64, 16, 'relu')
+    # MLP.build_layer(16, 1, 'linear')
     # MLP.train(X, y_train)
-    # # MLP.plot_loss()
+    # MLP.plot_loss()
     # y_pred = MLP.predict(X)
     # print(f"y_true:{y_train}")
     # print(f"y_pred:{y_pred}")
-    # MLP.evaluate(y_train, y_pred)
+    # # MLP.evaluate(y_train, y_pred)
     # plt.scatter(X, y, color='blue', label='Data')
-    # plt.plot(X, y_pred, color='red', label='Fitted Curve')
+    # plt.plot(X, y_pred, color='red', label='Fitted Curve', linewidth = 3)
     # plt.legend()
     # plt.show()
 
@@ -325,20 +326,20 @@ if __name__ == '__main__':
     max_val = np.max(X_train, axis=0)
     X_train = (X_train - min_val) / (max_val - min_val)
     X_test = (X_test - min_val) / (max_val - min_val)
-    MLP = MultilayerPerceptron(n_iter=500, lr=0.07, tol=0.001, train_mode='MBGD', batch_size=10, type='classify')
+    MLP = MultilayerPerceptron(n_iter=500, lr=0.1, tol=0.0001, train_mode='MBGD', batch_size=10, type='classify')
     # MLP.build_layer(n_feature, 64, 'relu')
     # MLP.build_layer(64, 128, 'relu')
     # MLP.build_layer(128, 256, 'relu')
     # MLP.build_layer(256, 32, 'relu')
     # MLP.build_layer(32, 1, 'sigmoid')
 
-    MLP.build_layer(n_feature, 64, 'relu')
-    MLP.build_layer(64, 128, 'relu')
-    MLP.build_layer(128, 32, 'relu')
-    MLP.build_layer(32, 1, 'sigmoid')
+    # MLP.build_layer(n_feature, 64, 'relu')
+    # MLP.build_layer(64, 128, 'relu')
+    # MLP.build_layer(128, 32, 'relu')
+    # MLP.build_layer(32, 1, 'sigmoid')
 
-    # MLP.build_layer(n_feature, 1024, 'relu')
-    # MLP.build_layer(1024, 1, 'sigmoid')
+    MLP.build_layer(n_feature, 1024, 'relu')
+    MLP.build_layer(1024, 1, 'sigmoid')
     MLP.train(X_train, y_train)
     MLP.plot_loss()
     y_pred = MLP.predict(X_test)
@@ -375,7 +376,6 @@ if __name__ == '__main__':
     #     y_train[y_train == 2] = 1.0000000001
     #     y_train[y_train == 1] = 0
     #     # print(y_train)
-
     #     # 创建并训练模型
     #     model = MultilayerPerceptron(n_iter=300, lr=0.07, tol=0.001, train_mode='MBGD', batch_size=10, type='classify')
     #     model.build_layer(2, 64, 'relu')
@@ -383,7 +383,6 @@ if __name__ == '__main__':
     #     model.build_layer(128, 32, 'relu')
     #     model.build_layer(32, 1, 'sigmoid')
     #     model.train(X_train, y_train)
-        
     #     # 预测并计算性能指标（例如准确率）
     #     y_pred = model.predict(X_val)
     #     accuracy = model.accuracy(y_val, y_pred)
