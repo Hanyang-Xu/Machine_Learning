@@ -11,7 +11,10 @@ class DecisionTreePlotter:
         # 判断是否为内部节点
         if dt_node.children:
             # 获取当前特征名称
-            feature_name = self.feature_names[dt_node.feature_index] if self.feature_names else str(dt_node.feature_index)
+            feature_name = self.feature_names[dt_node.feature_index].get('name', str(dt_node.feature_index)) if self.feature_names else str(dt_node.feature_index)
+            # print(feature_name)
+            # 确保 feature_name 是字符串类型
+            feature_name = str(feature_name)  
             
             # 创建当前节点
             self.graph.node(str(id(dt_node)), label=feature_name, shape='box')
@@ -24,14 +27,24 @@ class DecisionTreePlotter:
                 # 获取当前特征值对应的标签
                 label = str(feature_value)
                 if self.feature_names:
-                    d_value = self.feature_names[dt_node.feature_index].get('value_names', {})
-                    label = d_value.get(feature_value, label)
+                    # 如果 feature_names 是字典，获取 value_names 映射
+                    feature_info = self.feature_names[dt_node.feature_index]
+                    if isinstance(feature_info, dict):
+                        d_value = feature_info.get('value_names', {})
+                        label = d_value.get(feature_value, label)
                 
                 # 创建从当前节点到子节点的边
                 self.graph.edge(str(id(dt_node)), str(id(dt_child)), label=label, fontsize='10')
         else:
             # 叶子节点的标签
-            label = self.label_names[dt_node.value] if self.label_names else str(dt_node.value)
+            # print(f"Leaf node value: {dt_node.value}")  # 调试输出，查看叶子节点值
+            if self.label_names and 0 <= dt_node.value < len(self.label_names):
+                label = self.label_names[dt_node.value]  # 正常索引
+            else:
+                # 如果超出了范围，使用一个默认标签
+                label = f"Unknown label {dt_node.value}"  # 或者使用默认标签 "Unknown"
+            
+            # 创建叶子节点
             self.graph.node(str(id(dt_node)), label=label, shape='ellipse')
 
     def plot(self):

@@ -86,22 +86,58 @@ class DecisionTree:
             return str(self.tree_)
         return ''
     
+    def reset(self):
+        self.tree_ = None
+    
+def load_data(file, ratio, random_state = None):
+        dataset = np.loadtxt(file, dtype=int)
+        if random_state is not None:
+            np.random.seed(random_state)
+
+        indices = np.arange(dataset.shape[0])
+        np.random.shuffle(indices)
+
+        split_index = int(dataset.shape[0] * (1 - ratio))
+        train_indices, test_indices = indices[:split_index], indices[split_index:]
+        train_data = dataset[train_indices]
+        test_data = dataset[test_indices]
+        X_train = train_data[:, 1:-1]
+        y_train = train_data[:, -1]
+        X_test = test_data[:, 1:-1]
+        y_test = test_data[:, -1]
+        return X_train, X_test, y_train, y_test
+
 if __name__ == '__main__':
 
-    data = np.loadtxt('decision_tree/lenses/lenses.data', dtype=int)
-    split_index = int(0.7*data.shape[0])
-    X_train = data[:split_index, 1:-1]
-    y_train = data[:split_index, -1]
-    X_test = data[split_index:, 1:-1]
-    y_test = data[split_index:, -1]
+    # for n in range(5):
+    #     ratio = 0.1 + 0.1*n
+    #     # print(ratio)
+    #     accuracy_list = []
+    #     for i in range(1000):
+            # X_train, X_test, y_train, y_test = load_data('decision_tree/lenses/lenses.data', ratio)
+            # dt01 = DecisionTree()
+            # dt01.reset()
+            # dt01.train(X_train,y_train)
+            # y_pred = dt01.predict(X_test)
+            # accuracy = np.sum(y_pred == y_test) / len(y_test)
+    #         accuracy_list.append(accuracy)
+    #     print("ratio = {:.2f}, accuracy = {:.2f}".format(ratio, np.mean(accuracy_list)))
+        
+        
+    X_train, X_test, y_train, y_test = load_data('decision_tree/lenses/lenses.data', 0.3)
     dt01 = DecisionTree()
+    dt01.reset()
     dt01.train(X_train,y_train)
     y_pred = dt01.predict(X_test)
     accuracy = np.sum(y_pred == y_test) / len(y_test)
     print(accuracy)
+    feature_names = [
+    {'name': 'age of the patient', 'value_names': {1: 'young', 2: 'pre-presbyopic', 3: 'presbyopic'}},
+    {'name': 'spectacle prescription', 'value_names': {1: 'myope', 2: 'hypermetrope'}},
+    {'name': 'astigmatic', 'value_names': {1: 'no', 2: 'yes'}},
+    {'name': 'tear production rate', 'value_names': {1: 'reduced', 2: 'normal'}}]
 
-    feature_names = ['age of the patient', 'spectacle prescription', 'astigmatic', 'tear production rate']
-    label_names = ['hard contact lenses', 'soft contact lenses', 'no contact lenses']
-    plotter = DecisionTreePlotter(dt01.tree_)
+    label_names = ['_','hard contact lenses', 'soft contact lenses', 'no contact lenses']
+    plotter = DecisionTreePlotter(dt01.tree_, feature_names, label_names)
     plotter.plot()
           

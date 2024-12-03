@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class MultilayerPerceptron():
-    def __init__(self, n_iter=200, lr=1e-3, tol=None, train_mode='SGD', batch_size = 10, type='classify'):
+    def __init__(self, n_iter=200, lr=1e-3, tol=None, train_mode='SGD', batch_size = 10, type='classify', w0=0.5, w1=0.5, gate=0.5):
         self.batch_size = batch_size
         self.n_iter = n_iter
         self.lr = lr
@@ -11,10 +11,14 @@ class MultilayerPerceptron():
         self.type = type
         self.best_loss = np.inf
         self.patience = 10
+        self.w0 = w0
+        self.w1 = w1
+        self.gate = gate
         self.layer_list = []
         self.H = []  
         self.U = []  
         self.loss = []
+        self.layer_shape = []
 
     class layer:
         def __init__(self, input_num, cell_num, activation=None):
@@ -54,7 +58,7 @@ class MultilayerPerceptron():
         if self.type == 'classify':
             # print("using cross entropy")
             epsilon = 1e-5
-            loss = -(y*np.log(y_pred + epsilon) + (1-y)*np.log(1-y_pred+epsilon))
+            loss = -(self.w1*y*np.log(y_pred + epsilon) + self.w0*(1-y)*np.log(1-y_pred+epsilon))
             loss = np.mean(loss)
         elif self.type == 'regression':
             # print("using mse loss")
@@ -63,12 +67,12 @@ class MultilayerPerceptron():
     
     def _cal_E_o(self, y, y_pred):
         if self.type == "classify":
-            return (y_pred-y)/(y_pred*(1-y_pred))
+            epsilon = 1e-10  # 小常数，防止除零
+            return (y_pred - y) / (y_pred * (1 - y_pred) + epsilon)
         elif self.type == "regression":
             return y_pred - y
 
     def _shuffle(self, X, y):
-        y = y.reshape(-1,1)
         index = np.random.permutation(X.shape[0])
         X_shuffled = X[index]
         y_shuffled = y[index]
@@ -76,6 +80,7 @@ class MultilayerPerceptron():
 
     def build_layer(self, input_num, cell_num, activation=None):
         layer = self.layer(input_num, cell_num, activation)
+        self.layer_shape.append(cell_num)
         self.layer_list.append(layer)
     
     def forward(self, X):
@@ -88,7 +93,6 @@ class MultilayerPerceptron():
                 X = self._preprocess_data(X)
                 U = X @ self.layer_list[i].W.T
                 self.U.append(U)
-                # print(U)
                 H = self.layer_list[i].activate(U)
                 self.H.append(H)
             else:
@@ -108,11 +112,8 @@ class MultilayerPerceptron():
         for i in range(len(H_reverse_list)-1):
             if i == 0:
                 y_pred = H_reverse_list[i]
-                y_pred = y_pred.reshape(-1,1)
-                y = y.reshape(-1,1)
                 E_o = self._cal_E_o(y, y_pred)
                 delta_z = E_o*layer_reverse_list[i].act_derivative(U_reverse_list[i])
-                print(f'delta_z = {delta_z}')
                 delta_z = delta_z.T
                 delta_u.append(delta_z)
                 delta_z = delta_z[:,:,np.newaxis]
@@ -141,6 +142,7 @@ class MultilayerPerceptron():
             X, y = self._shuffle(init_X, init_y)
             sample = X[0,:].reshape(-1,X.shape[1])
             y = y[0,:].reshape(-1)
+            print(f'X_hat:{y}')
             self.forward(sample)
             y_pred = self.H[len(self.H)-1].reshape(-1)
             loss = self._loss(y, y_pred)
@@ -163,55 +165,57 @@ class MultilayerPerceptron():
             
     def mini_batch_update(self, init_X, init_y):
         epoch_no_improve = 0
-        break_out = False
         batch_size = self.batch_size
+        # print('========in the mini_batch========')
 
         for iter in range(self.n_iter):
+            if iter%100 == 0:
+                print(f"[{iter}/{self.n_iter}]")
             X, y = self._shuffle(init_X, init_y)
-            for j in range(int(X.shape[0]/batch_size)):
-                sample = X[j*batch_size:(j+1)*batch_size,:].reshape(-1,X.shape[1])
-                y_sample = y[j*batch_size:(j+1)*batch_size,:].reshape(-1)
-                self.forward(sample)
-                y_pred = self.H[len(self.H)-1].reshape(-1)
-                loss = self._loss(y_sample, y_pred)
-                self.loss.append(loss)
+            sample = X[:batch_size,:].reshape(-1,X.shape[1])
+            # print(f'X_shape:{sample.shape}')
+            y_sample = y[:batch_size,:]
+            # print(f'X_hat_shape:{y_sample.shape}')
+            self.forward(sample)
+            y_pred = self.H[len(self.H)-1]
+            # print(f'y_pred_shape:{y_pred.shape}')
+            loss = self._loss(y_sample, y_pred)
+            # print(f'loss:{loss}')
+            self.loss.append(loss)
 
-                if self.tol is not None:
-                    if loss < self.best_loss - self.tol:
-                        self.best_loss = loss
-                        epoch_no_improve = 0
-                    elif np.abs(loss - self.best_loss) < self.tol:
-                        epoch_no_improve += 1
-                        if epoch_no_improve >= self.patience:
-                            print(f"Early stopping triggered due to the no improvement in loss.")
-                            break_out = True
-                            break
-                    else:
-                        epoch_no_improve = 0
-                
-                grad = self.backward(y_sample)[::-1]
-                for num, layer in enumerate(self.layer_list):
-                    layer.W = layer.W - self.lr * grad[num]
-    
-            if break_out:
-                break_out = False
-                break
+            if self.tol is not None:
+                if loss < self.best_loss - self.tol:
+                    self.best_loss = loss
+                    epoch_no_improve = 0
+                elif np.abs(loss - self.best_loss) < self.tol:
+                    epoch_no_improve += 1
+                    if epoch_no_improve >= self.patience:
+                        print(f"Early stopping triggered due to the no improvement in loss.")
+                        break
+                else:
+                    epoch_no_improve = 0
+            
+            grad = self.backward(y_sample)[::-1]
+            for num, layer in enumerate(self.layer_list):
+                layer.W = layer.W - self.lr * grad[num]
 
     def train(self, X_train, Y_train):
         if self.train_mode == 'SGD':
             self.stochastic_update(X_train, Y_train)
         elif self.train_mode == 'MBGD':
+            print(f'Y_train_shape:{Y_train.shape}')
             self.mini_batch_update(X_train, Y_train)
+
 
     def predict(self, X):
         self.forward(X)
         if self.type == "classify":
             y_pred = self.H[-1].reshape(-1)
             for i, y in enumerate(y_pred):
-                if y > 0.5:
-                    y_pred[i] = 2
-                elif y < 0.5:
+                if y > self.gate:
                     y_pred[i] = 1
+                elif y < self.gate:
+                    y_pred[i] = 0
         if self.type == "regression":
             y_pred = self.H[-1].reshape(-1)
         return y_pred
@@ -227,12 +231,12 @@ class MultilayerPerceptron():
 
     def precision(self,y_true, y_pred):
         TP = np.sum((y_true == 1) & (y_pred == 1))
-        FP = np.sum((y_true == 2) & (y_pred == 1))
+        FP = np.sum((y_true == 0) & (y_pred == 1))
         return TP / (TP + FP) if (TP + FP) != 0 else 0
 
     def recall(self,y_true, y_pred):
         TP = np.sum((y_true == 1) & (y_pred == 1))
-        FN = np.sum((y_true == 1) & (y_pred == 2))
+        FN = np.sum((y_true == 1) & (y_pred == 0))
         return TP / (TP + FN) if (TP + FN) != 0 else 0
     
     def f1_score(self, y_true, y_pred):
@@ -247,63 +251,10 @@ class MultilayerPerceptron():
         print(f"recall={self.recall(y_true, y_pred)}")
         print(f"f1_score={self.f1_score(y_true, y_pred)}")
 
-def load_data(file, ratio, random_state = None):
-        dataset = np.loadtxt(file, delimiter=',')
-        if random_state is not None:
-            np.random.seed(random_state)
-
-        indices = np.arange(dataset.shape[0])
-        np.random.shuffle(indices)
-
-        split_index = int(dataset.shape[0] * (1 - ratio))
-        train_indices, test_indices = indices[:split_index], indices[split_index:]
-        train_data = dataset[train_indices]
-        test_data = dataset[test_indices]
-        X_train = train_data[:, 1:]
-        y_train = train_data[:, 0]
-        # print(f"y_train:{y_train}")
-        X_test = test_data[:, 1:]
-        y_test = test_data[:, 0]
-        y_train[y_train == 2] = 1.0000000001
-        y_train[y_train == 1] = 0
-        # print(f"formed_y_train:{y_train}")
-        return X_train, X_test, y_train, y_test
-
-def plot_decision_boundary(MLP, X_test, y_test):
-    x_min, x_max = X_test[:, 0].min() - 0.1, X_test[:, 0].max() + 0.1
-    y_min, y_max = X_test[:, 1].min() - 0.1, X_test[:, 1].max() + 0.1
-    xx, yy = np.meshgrid(np.linspace(x_min, x_max, 100), np.linspace(y_min, y_max, 100))
-    grid_points = np.c_[xx.ravel(), yy.ravel()]
-    Z = MLP.predict(grid_points)
-    Z = Z.reshape(xx.shape)  
-    plt.contourf(xx, yy, Z, cmap=plt.cm.RdYlBu, alpha=0.3)
-    plt.scatter(X_test[y_test == 2][:, 0], X_test[y_test == 2][:, 1], color='blue', label='Class 2', edgecolor='k')
-    plt.scatter(X_test[y_test == 1][:, 0], X_test[y_test == 1][:, 1], color='red', label='Class 1', edgecolor='k')
-    plt.xlabel('Feature 1')
-    plt.ylabel('Feature 2')
-    plt.legend()
-    plt.title('Decision Boundary and Test Data Points')
-    plt.show()
-
-
-
-if __name__ == '__main__':
-    X_train, X_test, y_train, y_test= load_data('multilayer_perceptron/X_data.txt', 0.3, True)
-    # print(f"X:{X_train}")
-    # print(f"y:{y_train.shape}")
-    _,n_feature = X_train.shape
-    min_val = np.min(X_train, axis=0)
-    max_val = np.max(X_train, axis=0)
-    X_train = (X_train - min_val) / (max_val - min_val)
-    X_test = (X_test - min_val) / (max_val - min_val)
-    MLP = MultilayerPerceptron(n_iter=500, lr=0.1, tol=0.0001, train_mode='MBGD', batch_size=10, type='classify')
-    MLP.build_layer(n_feature, 1024, 'relu')
-    MLP.build_layer(1024, 1, 'sigmoid')
-    MLP.train(X_train, y_train)
-    # MLP.plot_loss()
-    y_pred = MLP.predict(X_test)
-    # print(f"y_true:{y_test}")
-    # print(f"y_pred:{y_pred}")
-    # MLP.evaluate(y_test, y_pred)
-    # plot_decision_boundary(MLP, X_test, y_test)
-
+    def reset(self):
+        """Reset the MLP model by reinitializing its weights and clearing history."""
+        self.layer_list = []
+        self.H = []
+        self.U = []
+        self.loss = []
+        self.best_loss = np.inf  # Reset best loss
